@@ -37,4 +37,4 @@ private:
     QLabel *brightnessLabel;
 };
 
-#endif // IMAGEINFOWIDGET_H
+#endif

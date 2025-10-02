@@ -2,6 +2,7 @@
 #include <QRgb>
 #include <cmath>
 #include <algorithm>
+#include <vector>
 
 void filter2D(QImage &image, double *kernel, size_t kWidth, size_t kHeight) {
     if (image.isNull() || kernel == nullptr || kWidth == 0 || kHeight == 0) {
@@ -30,11 +31,6 @@ void filter2D(QImage &image, double *kernel, size_t kWidth, size_t kHeight) {
                     int pixelX = x + static_cast<int>(kx) - kCenterX;
                     int pixelY = y + static_cast<int>(ky) - kCenterY;
 
-                    if (pixelX < 0) pixelX = -pixelX;
-                    if (pixelX >= width) pixelX = 2 * width - pixelX - 2;
-                    if (pixelY < 0) pixelY = -pixelY;
-                    if (pixelY >= height) pixelY = 2 * height - pixelY - 2;
-
                     pixelX = std::max(0, std::min(width - 1, pixelX));
                     pixelY = std::max(0, std::min(height - 1, pixelY));
 
@@ -54,6 +50,91 @@ void filter2D(QImage &image, double *kernel, size_t kWidth, size_t kHeight) {
             image.setPixel(x, y, qRgb(r, g, b));
         }
     }
+}
+
+double* createGaussianKernel1D(size_t size, double sigma) {
+    if (size % 2 == 0) {
+        size++;
+    }
+
+    double *kernel = new double[size];
+    double sum = 0.0;
+    int center = static_cast<int>(size) / 2;
+
+    for (size_t i = 0; i < size; ++i) {
+        int x = static_cast<int>(i) - center;
+        double value = std::exp(-(x * x) / (2.0 * sigma * sigma));
+        kernel[i] = value;
+        sum += value;
+    }
+
+    for (size_t i = 0; i < size; ++i) {
+        kernel[i] /= sum;
+    }
+
+    return kernel;
+}
+
+void gaussianBlur(QImage &image, size_t size, double sigma) {
+    if (image.isNull() || size == 0) {
+        return;
+    }
+    if (image.format() != QImage::Format_RGB32 &&
+        image.format() != QImage::Format_ARGB32) {
+        image = image.convertToFormat(QImage::Format_RGB32);
+    }
+
+    int width = image.width();
+    int height = image.height();
+
+    double* kernel = createGaussianKernel1D(size, sigma);
+    int kCenter = static_cast<int>(size) / 2;
+
+    QImage tempImage(image.size(), image.format());
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            double sumR = 0.0, sumG = 0.0, sumB = 0.0;
+            for (size_t k = 0; k < size; ++k) {
+                int pixelX = x + static_cast<int>(k) - kCenter;
+                pixelX = std::max(0, std::min(width - 1, pixelX));
+
+                QRgb pixel = image.pixel(pixelX, y);
+                double kernelValue = kernel[k];
+
+                sumR += qRed(pixel) * kernelValue;
+                sumG += qGreen(pixel) * kernelValue;
+                sumB += qBlue(pixel) * kernelValue;
+            }
+            int r = std::max(0, std::min(255, static_cast<int>(std::round(sumR))));
+            int g = std::max(0, std::min(255, static_cast<int>(std::round(sumG))));
+            int b = std::max(0, std::min(255, static_cast<int>(std::round(sumB))));
+            tempImage.setPixel(x, y, qRgb(r, g, b));
+        }
+    }
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            double sumR = 0.0, sumG = 0.0, sumB = 0.0;
+            for (size_t k = 0; k < size; ++k) {
+                int pixelY = y + static_cast<int>(k) - kCenter;
+                pixelY = std::max(0, std::min(height - 1, pixelY));
+
+                QRgb pixel = tempImage.pixel(x, pixelY);
+                double kernelValue = kernel[k];
+
+                sumR += qRed(pixel) * kernelValue;
+                sumG += qGreen(pixel) * kernelValue;
+                sumB += qBlue(pixel) * kernelValue;
+            }
+            int r = std::max(0, std::min(255, static_cast<int>(std::round(sumR))));
+            int g = std::max(0, std::min(255, static_cast<int>(std::round(sumG))));
+            int b = std::max(0, std::min(255, static_cast<int>(std::round(sumB))));
+            image.setPixel(x, y, qRgb(r, g, b));
+        }
+    }
+
+    delete[] kernel;
 }
 
 double* createGaussianKernel(size_t size, double sigma) {
