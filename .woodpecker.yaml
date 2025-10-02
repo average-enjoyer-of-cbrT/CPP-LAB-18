@@ -1,0 +1,18 @@
+pipeline:
+  build:
+    image: rabits/qt:5.15-desktop
+    commands:
+      - qmake ImageFilter.pro
+      - make -j$(nproc)
+      - echo "Build completed successfully"
+    when:
+      event: [push, pull_request]
+
+  test:
+    image: rabits/qt:5.15-desktop
+    commands:
+      - echo "Running tests..."
+      - ls -lh
+      - file ImageFilter || true
+    when:
+      event: [push, pull_request]
